@@ -1,0 +1,258 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><title>StegoLab</title>
+<style>
+:root{--bg:#eef1f4;--fg:#101820;--card:#fff;--mut:#5d6b78;--ac:#0b6e6e;--bd:#cdd5dc;--er:#b3261e;--bar:rgba(11,110,110,.2);box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media(prefers-color-scheme:dark){:root:not([data-theme=light]){--bg:#0d1317;--fg:#e4ecf0;--card:#151e24;--mut:#8fa1ad;--ac:#2fb5a8;--bd:#273540;--er:#ff8a80;--bar:rgba(47,181,168,.28)}}
+:root[data-theme=dark]{--bg:#0d1317;--fg:#e4ecf0;--card:#151e24;--mut:#8fa1ad;--ac:#2fb5a8;--bd:#273540;--er:#ff8a80;--bar:rgba(47,181,168,.28)}
+*{box-sizing:border-box}html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 Georgia,'Times New Roman',serif}
+.w{max-width:900px;margin:auto;padding:18px}h1{font-size:30px;margin:.2em 0}h2{font-size:20px}h3{font-size:15px;margin:18px 0 6px;color:var(--mut)}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:6px;padding:14px;margin:12px 0}
+.grid{display:grid;gap:10px;grid-template-columns:repeat(auto-fit,minmax(170px,1fr))}
+.opt{background:var(--card);border:1px solid var(--bd);border-radius:6px;padding:12px;cursor:pointer}.opt:hover{border-color:var(--ac)}.dis{opacity:.4;pointer-events:none}
+.b{display:inline-block;background:var(--ac);color:#fff;border:0;border-radius:6px;padding:9px 16px;font:inherit;cursor:pointer;text-decoration:none;margin:4px 6px 4px 0}.g{background:transparent;color:var(--fg);border:1px solid var(--bd)}
+textarea,input[type=file]{width:100%;background:var(--bg);color:var(--fg);border:1px solid var(--bd);border-radius:6px;padding:8px;font:inherit}
+table{border-collapse:collapse;width:100%;font-size:13px}td,th{padding:6px 8px;border-bottom:1px solid var(--bd);text-align:left}.cl{cursor:pointer}.cl:hover{background:var(--bg)}
+th{white-space:nowrap;vertical-align:bottom}.sec td{background:var(--bg);font-weight:bold;color:var(--mut);padding-top:10px}.mt{background:linear-gradient(90deg,var(--bar) var(--p,0%),transparent var(--p,0%));white-space:nowrap}.tot td{font-weight:bold;border-top:2px solid var(--bd)}tr.on td{background:var(--bar)}tr.cl{cursor:pointer}.mx{font-size:12px}.mx td,.mx th{padding:5px 7px}select{background:var(--bg);color:var(--fg);border:1px solid var(--bd);border-radius:6px;padding:7px;font:inherit}
+canvas,img,video{max-width:100%}audio{width:100%}.er{color:var(--er)}small{color:var(--mut)}pre{white-space:pre-wrap;margin:0}
+</style></head><body><div class="w" id="app"></div><script>
+const $=s=>document.querySelector(s),cl=(v,a,b)=>v<a?a:v>b?b:v,R2=Math.SQRT1_2;
+const mk=N=>Array.from({length:N},(_,k)=>Array.from({length:N},(_,n)=>Math.sqrt((k?2:1)/N)*Math.cos(Math.PI*(2*n+1)*k/(2*N))));
+const C8=mk(8),C4=mk(4),fd=(C,v)=>C.map(r=>r.reduce((s,c,n)=>s+c*v[n],0)),id=(C,X)=>X.map((_,n)=>C.reduce((s,r,k)=>s+r[n]*X[k],0));
+const qm=(c,b,D)=>Math.round((c-b*D/2)/D)*D+b*D/2,qd=(c,D)=>Math.abs(c-qm(c,1,D))<Math.abs(c-qm(c,0,D))?1:0;
+const T=M=>M[0].map((_,j)=>M.map(r=>r[j])),d2=(A,f)=>T(T(A.map(r=>f(r))).map(r=>f(r)));
+const F4=v=>fd(C4,v),I4=v=>id(C4,v);
+const rg=s=>()=>{s|=0;s=s+0x6D2B79F5|0;let t=Math.imul(s^s>>>15,1|s);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296};
+const pn=n=>{const r=rg(99),o=new Int8Array(n);for(let i=0;i<n;i++)o[i]=r()<.5?-1:1;return o};
+const need=(p,n)=>{if(p<n)throw Error('Capacity too small for this payload (fits '+p+' of '+n+' bits). Use a bigger cover or smaller payload.')};
+const blk=(y,i,N,P,m)=>Array.from({length:N},(_,k)=>cl(y[i+k],P.lo+m,P.hi-m)),put=(y,i,v,P)=>v.forEach((t,k)=>y[i+k]=cl(Math.round(t),P.lo,P.hi));
+function fft(re,im){const n=re.length;for(let i=1,j=0;i<n;i++){let b=n>>1;for(;j&b;b>>=1)j^=b;j^=b;if(i<j){[re[i],re[j]]=[re[j],re[i]];[im[i],im[j]]=[im[j],im[i]]}}
+for(let l=2;l<=n;l<<=1){const w=-2*Math.PI/l;for(let i=0;i<n;i+=l)for(let k=0;k<l/2;k++){const c=Math.cos(w*k),s=Math.sin(w*k),a=i+k,b=a+l/2,tr=re[b]*c-im[b]*s,ti=re[b]*s+im[b]*c;re[b]=re[a]-tr;im[b]=im[a]-ti;re[a]+=tr;im[a]+=ti}}}
+function svd(M){const n=M.length,A=M.map(r=>r.slice()),V=M.map((_,i)=>M.map((_,j)=>+(i==j)));
+for(let sw=0;sw<30;sw++){let off=0;for(let i=0;i<n-1;i++)for(let j=i+1;j<n;j++){let al=0,be=0,ga=0;for(let k=0;k<n;k++){al+=A[k][i]**2;be+=A[k][j]**2;ga+=A[k][i]*A[k][j]}
+if(Math.abs(ga)<=1e-9*Math.sqrt(al*be))continue;off=1;const z=(be-al)/(2*ga),t=Math.sign(z)/(Math.abs(z)+Math.sqrt(1+z*z)),c=1/Math.sqrt(1+t*t),s=c*t;
+for(const Z of[A,V])for(let k=0;k<n;k++){const a=Z[k][i],b=Z[k][j];Z[k][i]=c*a-s*b;Z[k][j]=s*a+c*b}}if(!off)break}
+let m=0;const sg=[];for(let j=0;j<n;j++){sg[j]=Math.hypot(...A.map(r=>r[j]));if(sg[j]>sg[m])m=j}
+return{s:sg[m],u:A.map(r=>r[m]/sg[m]),v:V.map(r=>r[m])}}
+const fb=v=>v>0?v&1:1-(-v&1),PL=[0,8,16,32,64],PW=[3,3,4,5,6],rng=d=>d>=128?-1:d>=64?4:d>=32?3:d>=16?2:d>=8?1:0;
+const ana=a=>{const s=[],d=[];for(let j=0;j<16;j++){s[j]=(a[2*j]+a[2*j+1])*R2;d[j]=(a[2*j]-a[2*j+1])*R2}return{d,M:d2([0,1,2,3].map(k=>s.slice(4*k,4*k+4)),F4)}};
+const fit=(v,P,sh)=>{let mn=1e9,mx=-1e9;const r=v.map(t=>{t=Math.round(t);if(t<mn)mn=t;if(t>mx)mx=t;return t});const s=!sh?0:mx>P.hi?P.hi-mx:mn<P.lo?P.lo-mn:0;return mn+s<P.lo||mx+s>P.hi?null:r.map(t=>t+s)};
+const rb=(y,i,N,P,m,p,sh,bf)=>{const raw=Array.from(y.slice(i,i+N));let r=bf(raw,p),o=fit(r.o,P,sh);if(!o){r=bf(raw.map(v=>cl(v,P.lo+m,P.hi-m)),p);o=r.o.map(t=>cl(Math.round(t),P.lo,P.hi))}o.forEach((t,k)=>y[i+k]=t);return r.p};
+const jf=f5=>(x,B,P)=>{const y=x.slice(),n=B.length,q=6;let p=0;for(let i=0;i+8<=y.length&&p<n;i+=8)p=rb(y,i,8,P,16,p,1,(s,p0)=>{const X=fd(C8,s),Q=X.map(c=>Math.round(c/q));let p=p0;
+for(let k=1;k<8&&p<n;k++){let v=Q[k];if(!f5){if(v!==0&&v!==1)Q[k]=v&~1|B[p++]}else if(v!==0){if(fb(v)!==B[p]){v+=v>0?-1:1;Q[k]=v;if(v===0)continue}p++}}
+return{o:id(C8,Q.map((v,k)=>k?v*q:X[0])),p}});need(Math.min(p,n),n);return y};
+const xf=f5=>y=>{const o=[];for(let i=0;i+8<=y.length;i+=8){const Q=fd(C8,Array.from(y.slice(i,i+8))).map(c=>Math.round(c/6));for(let k=1;k<8;k++){const v=Q[k];if(f5){if(v)o.push(fb(v))}else if(v!==0&&v!==1)o.push(v&1)}}return o};
+const lsbX=y=>Array.from(y,v=>v&1);
+const EN=512,ED=[48,80];
+const ecep=(y,s)=>{const re=new Float64Array(EN),im=new Float64Array(EN);for(let k=0;k<EN;k++)re[k]=(y[s*EN+k]-32768)*(.5-.5*Math.cos(2*Math.PI*k/EN));fft(re,im);for(let k=0;k<EN;k++){re[k]=Math.log(Math.hypot(re[k],im[k])+1e-6);im[k]=0}fft(re,im);return re[80]-re[48]};
+const E={
+lsb:(x,B)=>{const y=x.slice(),n=B.length;need(Math.min(y.length,n),n);for(let i=0;i<n;i++)y[i]=y[i]&~1|B[i];return y},
+lsbm:(x,B,P)=>{const y=x.slice(),n=B.length,r=rg(7);need(Math.min(y.length,n),n);for(let i=0;i<n;i++)if((y[i]&1)!==B[i])y[i]+=y[i]<=P.lo?1:y[i]>=P.hi?-1:r()<.5?1:-1;return y},
+pvd:(x,B,P)=>{const y=x.slice(),n=B.length;let p=0;for(let i=0;i+1<y.length&&p<n;i+=2){const a=y[i],b=y[i+1],d=Math.abs(a-b),r=rng(d);if(r<0)continue;
+let v=0;for(let j=0;j<PW[r];j++)v=v<<1|(B[p+j]||0);p+=PW[r];const m=PL[r]+v-d,h=Math.ceil(m/2),f=Math.floor(m/2),o=fit(a>=b?[a+h,b-f]:[a-h,b+f],P,1);y[i]=o[0];y[i+1]=o[1]}need(Math.min(p,n),n);return y},
+jsteg:jf(0),f5:jf(1),
+dctqim:(x,B,P)=>{const y=x.slice(),n=B.length;let p=0;for(let i=0;i+8<=y.length&&p<n;i+=8)p=rb(y,i,8,P,12,p,1,(s,p0)=>{const X=fd(C8,s);let p=p0;for(const k of[2,3])if(p<n)X[k]=qm(X[k],B[p++],20);return{o:id(C8,X),p}});need(Math.min(p,n),n);return y},
+dwtqim:(x,B,P)=>{const y=x.slice(),n=B.length;need(Math.min(y.length>>1,n),n);for(let j=0;j<n;j++)rb(y,2*j,2,P,8,0,1,s=>{const t=(s[0]+s[1])*R2,d=qm((s[0]-s[1])*R2,B[j],16);return{o:[(t+d)*R2,(t-d)*R2],p:0}});return y},
+dds:(x,B,P)=>{const y=x.slice(),n=B.length;let p=0;for(let i=0;i+32<=y.length&&p<n;i+=32)p=rb(y,i,32,P,10,p,0,(s,p0)=>{const{d,M}=ana(s),g=svd(M),t=qm(g.s,B[p0],24)-g.s,S=d2(M.map((row,u)=>row.map((e,v)=>e+t*g.u[u]*g.v[v])),I4).flat(),o=[];
+for(let j=0;j<16;j++){o[2*j]=(S[j]+d[j])*R2;o[2*j+1]=(S[j]-d[j])*R2}return{o,p:p0+1}});need(Math.min(p,n),n);return y},
+ss:(x,B,P)=>{const y=x.slice(),n=B.length,L=P.L,p=pn(y.length);need(Math.min(Math.floor(y.length/L),n),n);
+for(let j=0;j<n;j++){const o=j*L,g=B[j]?1:-1;let a=P.a;for(let it=0;it<14;it++){let s=0;for(let k=0;k<L;k++){const i=o+k;y[i]=cl(Math.round(x[i]+g*a*p[i]),P.lo,P.hi);if(k)s+=(y[i]-y[i-1])*(p[i]-p[i-1])}if(g*s>=P.a*L)break;a=Math.min(a*1.6+1,(P.hi-P.lo)/2)}}return y},
+echo:(x,B)=>{const N=EN,nb=B.length,y=x.slice(),xd=Float64Array.from(x),r=rg(5);need(Math.min(Math.floor(x.length/N),nb),nb);
+for(let j=0;j<nb;j++){let e=0;for(let k=0;k<N;k++)e+=(x[j*N+k]-32768)**2;if(Math.sqrt(e/N)<40)for(let k=0;k<N;k++)xd[j*N+k]+=(r()-.5)*96}
+for(let j=0;j<nb;j++){const d=ED[B[j]];let g=.55;for(let it=0;it<9;it++){if(it>2)for(let k=0;k<N;k++)xd[j*N+k]+=(r()-.5)*160*(it-2);let pk=1;for(let k=0;k<N;k++){const i=j*N+k;pk=Math.max(pk,Math.abs(xd[i]-32768),i>=d?Math.abs(xd[i-d]-32768):0)}const sc=Math.min(1,32700/(pk*(1+g)));for(let k=0;k<N;k++){const i=j*N+k;y[i]=cl(Math.round(sc*(xd[i]-32768+(i>=d?g*(xd[i-d]-32768):0)))+32768,0,65535)}const c=ecep(y,j);if(B[j]?c>.15:c<-.15)break;g=Math.min(g+.1,.95)}}return y}};
+const X={lsb:lsbX,lsbm:lsbX,jsteg:xf(0),f5:xf(1),
+pvd:y=>{const o=[];for(let i=0;i+1<y.length;i+=2){const d=Math.abs(y[i]-y[i+1]),r=rng(d);if(r<0)continue;const v=d-PL[r];for(let j=PW[r]-1;j>=0;j--)o.push(v>>j&1)}return o},
+dctqim:y=>{const o=[];for(let i=0;i+8<=y.length;i+=8){const Z=fd(C8,Array.from(y.slice(i,i+8)));o.push(qd(Z[2],20),qd(Z[3],20))}return o},
+dwtqim:y=>{const o=[];for(let j=0;2*j+1<y.length;j++)o.push(qd((y[2*j]-y[2*j+1])*R2,16));return o},
+dds:y=>{const o=[];for(let i=0;i+32<=y.length;i+=32)o.push(qd(svd(ana(Array.from(y.slice(i,i+32))).M).s,24));return o},
+ss:(y,P)=>{const p=pn(y.length),o=[],L=P.L;for(let j=0;(j+1)*L<=y.length;j++){let s=0;for(let k=1;k<L;k++){const i=j*L+k;s+=(y[i]-y[i-1])*(p[i]-p[i-1])}o.push(s>0?1:0)}return o},
+echo:y=>{const o=[];for(let s=0;(s+1)*EN<=y.length;s++)o.push(ecep(y,s)>0?1:0);return o}
+};
+const AL=[['lsb','LSB'],['lsbm','LSB Matching'],['pvd','PVD'],['jsteg','F5/JSteg: JSteg'],['f5','F5/JSteg: F5'],['dctqim','DCT-QIM'],['dwtqim','DWT-QIM'],['dds','DWT-DCT-SVD'],['ss','Spread Spectrum'],['echo','Echo Hiding']];
+const MG=0xA53C,toBits=u=>{const o=[];u.forEach(v=>{for(let i=7;i>=0;i--)o.push(v>>i&1)});return o};
+function pack(mime,data){const m=new TextEncoder().encode(mime),b=new Uint8Array(1+m.length+data.length);b[0]=m.length;b.set(m,1);b.set(data,1+m.length);const h=[];for(let i=15;i>=0;i--)h.push(MG>>i&1);for(let i=31;i>=0;i--)h.push(b.length>>>i&1);return h.concat(toBits(b))}
+function unpack(b){let g=0,n=0;for(let i=0;i<16;i++)g=g<<1|b[i];if(g!==MG)throw Error('No hidden data found. Check the algorithm and that the file was not re-compressed or edited.');for(let i=0;i<32;i++)n=n*2+b[16+i];if(n*8+48>b.length)throw Error('Header found but data is incomplete.');const by=new Uint8Array(n);for(let i=0;i<n*8;i++)by[i>>3]|=b[48+i]<<(7-(i&7));return{mime:new TextDecoder().decode(by.slice(1,1+by[0])),data:by.slice(1+by[0])}}
+const zw=(t,B)=>{const s=B.map(b=>b?'\u200c':'\u200b').join(''),c=[...t];return c.length?c[0]+s+c.slice(1).join(''):s},zx=t=>[...t].filter(c=>c==='\u200b'||c==='\u200c').map(c=>+(c==='\u200c'));
+const imgF=async f=>{try{const b=await createImageBitmap(f);b.naturalWidth=b.width;b.naturalHeight=b.height;return b}catch(e){}return new Promise((ok,no)=>{const i=new Image();i.onload=()=>ok(i);i.onerror=()=>no(Error('Cannot read this image. If you are inside the Claude preview panel, save this HTML file and open it in Chrome/Edge from your computer.'));i.src=URL.createObjectURL(f)})};
+const vidF=f=>new Promise((ok,no)=>{const v=document.createElement('video');v.muted=true;v.playsInline=true;v.src=URL.createObjectURL(f);v.onloadeddata=()=>{v.currentTime=Math.min(.1,(v.duration||.2)/2)};v.onseeked=()=>ok(v);v.onerror=()=>no(Error('Cannot read this video'))});
+function toPix(s,w0,h0){const k=Math.min(1,900/Math.max(w0,h0)),w=Math.round(w0*k),h=Math.round(h0*k),c=document.createElement('canvas');c.width=w;c.height=h;const g=c.getContext('2d',{willReadFrequently:true});g.fillStyle='#fff';g.fillRect(0,0,w,h);g.drawImage(s,0,0,w,h);const D=g.getImageData(0,0,w,h),n=w*h,x=new Int32Array(n*3);for(let i=0;i<n;i++)for(let c=0;c<3;c++)x[c*n+i]=D.data[4*i+c];return{kind:'pix',w,h,D,x,P:{lo:0,hi:255,a:7,L:64}}}
+async function loadAud(f){const ac=new(window.AudioContext||window.webkitAudioContext)(),b=await ac.decodeAudioData(await f.arrayBuffer()),d=b.getChannelData(0),x=new Int32Array(d.length);for(let i=0;i<d.length;i++)x[i]=cl(Math.round(d[i]*32768),-32768,32767)+32768;ac.close();return{kind:'aud',sr:b.sampleRate,x,P:{lo:0,hi:65535,a:150,L:128}}}
+function outPix(c,x){const n=c.w*c.h,D=new ImageData(new Uint8ClampedArray(c.D.data),c.w,c.h);for(let i=0;i<n;i++)for(let k=0;k<3;k++)D.data[4*i+k]=x[k*n+i];const cv=document.createElement('canvas');cv.width=c.w;cv.height=c.h;cv.getContext('2d').putImageData(D,0,0);return cv}
+const wav=(x,sr)=>{const n=x.length,b=new DataView(new ArrayBuffer(44+2*n)),w=(o,s)=>[...s].forEach((ch,i)=>b.setUint8(o+i,ch.charCodeAt(0)));w(0,'RIFF');b.setUint32(4,36+2*n,true);w(8,'WAVEfmt ');b.setUint32(16,16,true);b.setUint16(20,1,true);b.setUint16(22,1,true);b.setUint32(24,sr,true);b.setUint32(28,sr*2,true);b.setUint16(32,2,true);b.setUint16(34,16,true);w(36,'data');b.setUint32(40,2*n,true);for(let i=0;i<n;i++)b.setInt16(44+2*i,x[i]-32768,true);return new Blob([b],{type:'audio/wav'})};
+function met(a,b,max,off){const n=a.length;let m=0,sa=0,sb=0,aa=0,bb=0,ab=0,ps=0;for(let i=0;i<n;i++){const u=a[i],v=b[i],d=u-v,z=u-off;m+=d*d;sa+=u;sb+=v;aa+=u*u;bb+=v*v;ab+=u*v;ps+=z*z}
+const mu=sa/n,mv=sb/n,va=aa/n-mu*mu,vb=bb/n-mv*mv,cv=ab/n-mu*mv,c1=(.01*max)**2,c2=(.03*max)**2;return{mse:m/n,psnr:m?10*Math.log10(max*max/(m/n)):Infinity,snr:m?10*Math.log10(ps/m):Infinity,ssim:(2*mu*mv+c1)*(2*cv+c2)/((mu*mu+mv*mv+c1)*(va+vb+c2))}}
+const esc=s=>s.replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])),f=(v,d=2)=>v==null?'–':isFinite(v)?v.toFixed(d):'∞';
+const S={ct:2,step:0,mode:'',op:'embed',cov:'',pay:'',alg:''},IC={image:'🖼',text:'📝',audio:'🔊',video:'🎬'},TY=['image','text','audio','video'];
+const ok=a=>S.cov=='text'?a=='lsb':a=='echo'?S.cov=='audio':1;
+const opt=(t,d,fn,x='')=>`<div class="opt ${x}" onclick="${fn}"><b>${t}</b><br><small>${d}</small></div>`;
+function set(o){Object.assign(S,o);draw()}
+const back=()=>set({step:S.step==5?(S.mode=='cmp'?3:4):S.step-1});
+const inp=(id,t,l,acc)=>`<div class="card"><b>${l}</b><br>${t=='text'?`<textarea id="${id}T" rows="4" placeholder="Type or paste text"></textarea>`:`<input type="file" id="${id}F" accept="${acc||t+'/*'}">`}</div>`;
+function draw(){const s=S.step,A=$('#app'),ex=S.op=='extract'&&S.mode=='stego';let h=s?`<button class="b g" onclick="back()">← Back</button><button class="b g" onclick="set({step:0})">Home</button>`:'';
+if(s==0)h=`<div class="card"><h1>Welcome to StegoLab</h1><p>Hide data inside images, text, audio and video with 10 steganography algorithms, extract it again, compare every algorithm on the same cover, or analyze stego pics you already have and get a recommendation.</p><p><small>স্বাগতম! এখানে ডেটা লুকানো, বের করা এবং algorithm compare করা যাবে।</small></p><button class="b" onclick="set({step:1})">Start</button></div>`;
+else if(s==1)h+=`<h2>What do you want to do?</h2><div class="grid">${opt('Steganography','Hide or extract data',"set({mode:'stego',step:2})")}${opt('Analyze results','Upload the real pic + the stego pic from every algorithm; get a ranking, a robustness test and a recommendation',"set({mode:'ana',step:2,cov:'image'})")}${opt('Compare','Hide the same payload with every algorithm and compare original vs stego',"set({mode:'cmp',op:'embed',step:2})")}</div>`;
+else if(s==2&&S.mode=='ana')h+=`<h2>Analyze results</h2><p><small>Upload the real (original) pic and the stego pics made by different algorithms (the PNG files downloaded from StegoLab). StegoLab detects each algorithm by itself, tests how well each one survives JPEG, resize and noise, and tells you which one to use.</small></p><div class="card"><b>Real (original) pic or audio</b><br><input type="file" id="anR" accept="image/*,audio/*"></div><div class="card"><b>Stego files (select all of them at once, any number: up to 9 for pictures, 10 for audio. A single ZIP file with all of them also works)</b><br><input type="file" id="anS" accept="image/*,audio/*,.zip" multiple></div><button class="b" onclick="analyze()">Analyze</button><div id="out"></div>`;
+else if(s==2&&S.mode=='cmp')h+=`<h2>Choose compare type</h2><div class="grid">${opt('Normal: 2 pic compare','Real pic vs Stego pic, with a full feature table for every algorithm',"set({ct:2,step:3})")}${opt('3 pic compare','Real pic + Compare pic 1 + Compare pic 2: choose any two algorithms and see them side by side',"set({ct:3,step:3})")}</div>`;
+else if(s==2)h+=`<h2>Hide or extract?</h2><div class="grid">${opt('Embed','Hide a payload inside a cover',"set({op:'embed',step:3})")}${opt('Extract','Recover a hidden payload from a stego file',"set({op:'extract',step:3})")}</div>`;
+else if(s==3)h+=`<h2>Choose payload and cover (16 combinations)</h2>`+TY.map(c=>`<h3>Cover: ${c}</h3><div class="grid">${TY.map(p=>opt(`${IC[p]} ${p} in ${IC[c]} ${c}`,'',`set({cov:'${c}',pay:'${p}',step:${S.mode=='cmp'?5:4}})`)).join('')}</div>`).join('');
+else if(s==4)h+=`<h2>Choose an algorithm</h2><div class="grid">${AL.map((a,i)=>opt(`${i+1}. ${a[1]}`,ok(a[0])?'':S.cov=='text'?'Text cover supports zero-width LSB only':'Audio cover only',`set({alg:'${a[0]}',step:5})`,ok(a[0])?'':'dis')).join('')}</div>`;
+else{const al=S.mode=='cmp'?'all applicable algorithms':AL.find(a=>a[0]==S.alg)[1];
+h+=`<h2>${S.mode=='cmp'?'Compare ('+S.ct+' pic)':ex?'Extract':'Embed'}: ${S.pay} ${ex?'from':'in'} ${S.cov}</h2><p><small>${al}.${S.cov=='video'?' Video cover uses its first frame as the carrier and gives a lossless PNG frame.':''}${S.cov=='text'?' Hidden bits are stored as invisible zero-width characters.':''}${S.cov=='audio'?' Audio is processed as mono and saved as 16-bit WAV.':''}</small></p>`+
+(ex?inp('cov',S.cov,'Stego '+S.cov,S.cov=='video'?'video/*,image/*':''):inp('cov',S.cov,'Cover '+S.cov,S.cov=='video'?'video/*':'')+inp('pay',S.pay,'Payload '+S.pay))+`<button class="b" onclick="run()">${ex?'Extract':S.mode=='cmp'?'Run comparison':'Embed'}</button><div id="out"></div>`}
+A.innerHTML=h}
+async function getCov(){if(S.cov=='text')return{kind:'txt',text:$('#covT').value};const fl=$('#covF').files[0];if(!fl)throw Error('Choose a file first.');
+if(S.cov=='audio')return loadAud(fl);if(S.cov=='video'&&fl.type.startsWith('video')){const v=await vidF(fl);return toPix(v,v.videoWidth,v.videoHeight)}const i=await imgF(fl);return toPix(i,i.naturalWidth,i.naturalHeight)}
+async function getPay(){if(S.pay=='text'){const t=$('#payT').value;if(!t)throw Error('Type the text to hide.');return{mime:'text/plain',data:new TextEncoder().encode(t)}}const fl=$('#payF').files[0];if(!fl)throw Error('Choose a payload file.');return{mime:fl.type||'application/octet-stream',data:new Uint8Array(await fl.arrayBuffer())}}
+let RES=[],COV;
+const ent=h=>{let t=0,e=0;for(const v of h)t+=v;for(const v of h)if(v)e-=v/t*Math.log2(v/t);return e};
+const bA=(g,B)=>{let c=0;for(let i=0;i<B.length;i++)c+=g[i]==B[i];return c/B.length},hd=g=>{let v=0;for(let i=0;i<16;i++)v=v<<1|g[i];return g.length>15&&v===MG};
+const ZW=/[\u200b\u200c]/g,CM={i:0,a:0,b:1},LB=()=>{const w=S.cov=='audio'?'audio':S.cov=='text'?'text':'pic';return{w,s:'Stego '+w,r:'Real '+w,c:'Compare '+w}};
+const ctxOf=c=>c.cx||(c.cx=c.kind=='txt'?{mx:1,eps:1,N:[...c.text].length||1,n:1}:{mx:c.P.hi,eps:c.P.hi/1000,N:c.x.length,n:c.w*c.h});
+function prp(c,x){if(c.kind=='txt'){const ch=[...x],z=ch.filter(t=>t=='\u200b'||t=='\u200c').length,v=x.replace(ZW,'');return{n:ch.length,vis:ch.length-z,zwN:z,zwp:ch.length?z/ch.length*100:0,bytes:new TextEncoder().encode(x).length,words:(v.match(/\S+/g)||[]).length,lines:v.split('\n').length}}
+const N=x.length,h=new Float64Array(256);let s=0,s2=0,lsb=0;
+if(c.kind=='aud'){let pk=0,zc=0,pv=0;for(let i=0;i<N;i++){const v=x[i]-32768,a=v<0?-v:v;s+=v;s2+=v*v;lsb+=x[i]&1;h[x[i]>>8]++;if(a>pk)pk=a;if(i&&(v>=0)!==(pv>=0))zc++;pv=v}
+const m=s/N,L=2048,st=Math.max(L,Math.floor((N-L)/40));let cs=0,cn=0;for(let o=0;o+L<=N&&cn<40;o+=st){const re=new Float64Array(L),im=new Float64Array(L);for(let k=0;k<L;k++)re[k]=(x[o+k]-32768)*(.5-.5*Math.cos(2*Math.PI*k/L));fft(re,im);let a=0,b=0;for(let k=1;k<L/2;k++){const g=Math.hypot(re[k],im[k]);a+=g*k;b+=g}if(b>0){cs+=a/b*c.sr/L;cn++}}
+return{sr:c.sr,n3:N,dur:N/c.sr,mean:m,rms:Math.sqrt(s2/N),pk,sd:Math.sqrt(Math.max(0,s2/N-m*m)),zc:zc/N*100,ent:ent(h),lsb:lsb/N*100,cen:cn?cs/cn:0,h}}
+const n=c.w*c.h,sc=[0,0,0];for(let i=0;i<N;i++){const v=x[i];s+=v;s2+=v*v;lsb+=v&1;h[v]++;sc[i/n|0]+=v}
+const m=s/N,bs=new Uint32Array(1<<19);let uq=0,gr=0,gc=0;for(let i=0;i<n;i++){const k=x[i]<<16|x[n+i]<<8|x[2*n+i];if(!(bs[k>>5]>>>(k&31)&1)){bs[k>>5]|=1<<(k&31);uq++}}
+for(let ch=0;ch<3;ch++)for(let i=1;i<n;i++)if(i%c.w){gr+=Math.abs(x[ch*n+i]-x[ch*n+i-1]);gc++}
+return{dim:c.w+' × '+c.h,n3:N,mR:sc[0]/n,mG:sc[1]/n,mB:sc[2]/n,mean:m,sd:Math.sqrt(Math.max(0,s2/N-m*m)),ent:ent(h),uq,lsb:lsb/N*100,grad:gc?gr/gc:0,h}}
+function pap(c,x){if(c.kind=='txt'){const a=c.text;return{visSame:+(x.replace(ZW,'')===a.replace(ZW,'')),rawSame:+(x===a),ins:Math.max(0,[...x].length-[...a].length)}}
+const a=c.x,N=a.length;let ch=0,ad=0,mxd=0,sd=0,sa=0,sb=0,aa=0,bb=0,ab=0;
+for(let i=0;i<N;i++){const u=a[i],v=x[i],d=v-u;if(d){ch++;const e=d<0?-d:d;ad+=e;if(e>mxd)mxd=e}sd+=d;sa+=u;sb+=v;aa+=u*u;bb+=v*v;ab+=u*v}
+const m=met(a,x,c.P.hi,c.kind=='aud'?32768:0),mu=sa/N,mv=sb/N,va=aa/N-mu*mu,vb=bb/N-mv*mv,q={chS:ch,chSp:ch/N*100,idS:100-ch/N*100,mse:m.mse,rmse:Math.sqrt(m.mse),psnr:m.psnr,ssim:m.ssim,snr:m.snr,mae:ad/N,mxd,bias:sd/N,corr:va>1e-9&&vb>1e-9?(ab/N-mu*mv)/Math.sqrt(va*vb):+!ch};
+if(c.kind=='pix'){const n=c.w*c.h;let cp=0;for(let i=0;i<n;i++)if(a[i]!==x[i]||a[n+i]!==x[n+i]||a[2*n+i]!==x[2*n+i])cp++;q.chP=cp;q.chPp=cp/n*100}return q}
+function vals(c,y,r){const re=!y,x0=c.kind=='txt'?c.text:c.x,x=re?x0:y,P0=c.p0||(c.p0=prp(c,x0)),P=re?P0:prp(c,x),Q=re?(c.q0||(c.q0=pap(c,x0))):pap(c,x),V={...P,...Q},bits=re?0:r.B;
+if(c.kind=='pix'){let s=0;for(let k=0;k<256;k++)s+=Math.min(P0.h[k],P.h[k]);V.hint=s/x0.length*100}
+return Object.assign(V,{alg:re?'None (original)':r.n,bits,rate:bits/(c.kind=='txt'?([...c.text].length||1):c.x.length),hdr:re?r.hdr0:r.hdr,acc:(re?r.ac0:r.ac)*100,ms:re?null:r.ms})}
+const nf=d=>v=>f(v,d),pf=d=>v=>v==null?'–':f(v,d)+'%',ii=v=>v==null?'–':Math.round(v).toLocaleString('en-US'),yn=v=>v==null?'–':v?'Yes':'No',tx=v=>v==null?'–':v;
+const nz={ch:(v,c)=>100-v/c.N*100,cP:(v,c)=>100-v/c.n*100,pct:v=>100-v,id:v=>v,sq:(v,c)=>100*(1-v/(c.mx*c.mx)),lin:(v,c)=>100*(1-v/c.mx),ps:v=>isFinite(v)?100*(1-10**(-v/20)):100,sim:v=>100*v,ab:(v,c)=>100*(1-Math.abs(v)/c.mx),co:v=>100*Math.max(0,v),b:v=>100*v,ins:(v,c)=>100*(1-v/c.N)};
+const DF=['Difference vs the real file (how much embedding changed it)',['chS','Changed samples (count)','q',ii,nz.ch],['chSp','Changed samples (%)','q',pf(4),nz.pct],['idS','Identical samples (%)','q',pf(4),nz.id],['mse','MSE – mean squared error','q',nf(4),nz.sq],['rmse','RMSE – root mean squared error','q',nf(4),nz.lin],['psnr','PSNR – peak signal-to-noise ratio (dB)','q',nf(2),nz.ps],['ssim','SSIM – structural similarity','q',nf(5),nz.sim],['mae','MAE – mean absolute difference','q',nf(4),nz.lin],['mxd','Max absolute difference','q',ii,nz.lin],['bias','Mean signed difference (bias)','q',nf(4),nz.ab],['corr','Pearson correlation','q',nf(6),nz.co]];
+const HID=['Hidden data (payload)',['alg','Algorithm used','i',tx],['bits','Embedded bits (header + payload)','i',ii],['rate','Embedding rate (bits per sample / char)','i',nf(5)],['hdr','Hidden-data header found by extractor','i',yn],['acc','Extraction bit accuracy (%)','i',pf(2)],['ms','Embedding time (ms)','i',nf(0)]];
+const SPEC={pix:['Image properties (each pic on its own)',['dim','Dimensions (width × height, px)','p',tx],['n3','Total samples (R+G+B values)','p',ii],['mR','Mean red','p',nf(3)],['mG','Mean green','p',nf(3)],['mB','Mean blue','p',nf(3)],['mean','Mean brightness (all channels)','p',nf(3)],['sd','Standard deviation (contrast)','p',nf(3)],['ent','Histogram entropy (bits)','p',nf(4)],['uq','Unique colours','p',ii],['lsb','LSB-plane “1” ratio (%)','p',pf(3)],['grad','Mean neighbour gradient (edge energy)','p',nf(3)],...DF,['chP','Changed pixels (count)','q',ii,nz.cP],['chPp','Changed pixels (%)','q',pf(4),nz.pct],['hint','Histogram intersection (%)','q',pf(3),nz.id],...HID],
+aud:['Audio properties (each file on its own)',['sr','Sample rate (Hz)','p',ii],['n3','Samples','p',ii],['dur','Duration (s)','p',nf(3)],['mean','Mean amplitude (DC offset)','p',nf(3)],['rms','RMS level','p',nf(2)],['pk','Peak amplitude','p',ii],['sd','Standard deviation','p',nf(2)],['zc','Zero-crossing rate (%)','p',pf(3)],['ent','Histogram entropy (bits)','p',nf(4)],['lsb','LSB-plane “1” ratio (%)','p',pf(3)],['cen','Spectral centroid (Hz)','p',nf(1)],...DF,['snr','SNR – signal-to-noise ratio (dB)','q',nf(2),nz.ps],...HID],
+txt:['Text properties (each text on its own)',['n','Characters (total)','p',ii],['vis','Visible characters','p',ii],['zwN','Invisible zero-width characters','p',ii],['zwp','Invisible share (%)','p',pf(3)],['bytes','UTF-8 size (bytes)','p',ii],['words','Words','p',ii],['lines','Lines','p',ii],'Difference vs the real text',['visSame','Visible text identical','q',yn,nz.b],['rawSame','Raw string identical','q',yn,nz.b],['ins','Inserted characters (count)','q',ii,nz.ins],...HID]};
+const cl01=v=>cl(v,0,100),sm=(a,b,e)=>a===b?100:typeof a=='string'||typeof b=='string'||!isFinite(a)||!isFinite(b)?0:100*(1-Math.abs(a-b)/Math.max(Math.abs(a),Math.abs(b),e));
+const mt=(s,a,b,c)=>s[2]=='i'||a==null||b==null||a!==a?null:cl01(s[2]=='p'?sm(a,b,c.eps):100-Math.abs(s[4](a,c)-s[4](b,c)));
+const scores=(A,B)=>SPEC[COV.kind].filter(s=>typeof s!='string').map(s=>mt(s,A[s[0]],B[s[0]],ctxOf(COV))).filter(m=>m!=null),avg=a=>a.reduce((x,y)=>x+y,0)/a.length;
+function cmpTbl(A,B,h1,h2,x){const cx=ctxOf(COV);let t=0,n=0;const rows=SPEC[COV.kind].map(s=>{if(typeof s=='string')return`<tr class="sec"><td colspan="4">${s}`;const m=mt(s,A[s[0]],B[s[0]],cx);if(m!=null){t+=m;n++}
+return`<tr><td>${s[1]}<td>${s[3](A[s[0]])}<td>${s[3](B[s[0]])}<td class="mt"${m==null?'>–':` style="--p:${m}%">${m.toFixed(3)}%`}`}).join(''),ov=n?t/n:0,w=LB().w;
+return`<table><tr><th>Feature<th>${h1}<th>${h2}<th>Match %</tr>${rows}${x?`<tr class="sec"><td colspan="4">Each ${w} against the real ${w}<tr><td>Overall match with the real ${w}<td>${f(x[0],3)}%<td>${f(x[1],3)}%<td>–`:''}<tr class="tot"><td>Overall match (average of all rows that have a %)<td><td><td class="mt" style="--p:${ov}%">${ov.toFixed(3)}%</table><small>${x?`Match % = how closely ${LB().c} 1 agrees with ${LB().c} 2 on that feature. Difference rows are each measured against the real ${w}.`:`Match % = how closely the stego value agrees with the real value (100% = identical).`}</small>`}
+function sumTbl(){const w=LB().w,c2=S.ct==2;return`<div class="card" style="overflow-x:auto"><b>All algorithms: overall match with the real ${w}</b><div style="margin:10px 0">View: <button class="b" onclick="CM.all=0;cmpDraw()">One algorithm</button> <button class="b" onclick="CM.all=1;cmpDraw()">All algorithms in one table</button> <button class="b" onclick="dlAll()">⬇ Download all stego files</button> <button class="b" onclick="dlZip()">⬇ Download all as one ZIP</button></div><table><tr><th>#<th>Algorithm<th>Overall match %<th>Identical samples %<th>PSNR dB<th>SSIM<th>Extraction accuracy</tr>${RES.map((r,i)=>r.err?`<tr><td>${i+1}<td>${r.n}<td colspan="5" class="er">${esc(r.err)}`:`<tr class="${c2?'cl':''}${c2&&i==CM.i?' on':''}"${c2?` onclick="CM.i=${i};CM.all=0;cmpDraw();$('#det').scrollIntoView()"`:''}><td>${i+1}<td>${r.n}<td class="mt" style="--p:${r.ov}%">${r.ov.toFixed(3)}%<td>${pf(4)(r.V.idS)}<td>${f(r.psnr)}<td>${f(r.ssim,4)}<td>${f(r.ac*100,1)}%`).join('')}</table><small>${c2?'Click a row (or use the dropdown below) to choose which algorithm’s pics and table to see.':'Pick the two algorithms below.'}</small></div>`}
+function allTbl(){const v=RES.filter(r=>!r.err),c=COV,cx=ctxOf(c),n=v.length+2,na=['alg','acc','hdr','ms'];
+const rows=SPEC[c.kind].map(s=>typeof s=='string'?`<tr class="sec"><td colspan="${n}">${s}`:`<tr><td>${s[1]}<td>${na.includes(s[0])?'–':s[3](v[0].VR[s[0]])}${v.map(r=>{const m=mt(s,r.V[s[0]],r.VR[s[0]],cx);return`<td class="mt"${m==null?'>':` style="--p:${m}%">`}${s[3](r.V[s[0]])}${m==null?'':`<br><small>${m.toFixed(2)}%</small>`}`}).join('')}`).join('');
+return`<div class="card" style="overflow-x:auto"><b>All algorithms in one table</b> (small % under each value = match with the real ${LB().w})<table class="mx"><tr><th>Feature<th>${LB().r}${v.map(r=>`<th>${r.n}`).join('')}</tr>${rows}<tr class="tot"><td>Overall match<td>${v.map(r=>`<td class="mt" style="--p:${r.ov}%">${r.ov.toFixed(3)}%`).join('')}</table>${RES.some(r=>r.err)?`<small class="er">Skipped: ${RES.filter(r=>r.err).map(r=>r.n).join(', ')} (payload too big for this cover)</small>`:''}</div>`}
+const crcT=(()=>{const t=[];for(let n=0;n<256;n++){let c=n;for(let k=0;k<8;k++)c=c&1?0xEDB88320^c>>>1:c>>>1;t[n]=c>>>0}return t})();
+const crc32=u=>{let c=-1;for(let i=0;i<u.length;i++)c=crcT[(c^u[i])&255]^c>>>8;return(c^-1)>>>0};
+async function mkZip(fs){const P=[],C=[],te=new TextEncoder();let off=0,cs=0;
+for(const f of fs){const d=new Uint8Array(await f.b.arrayBuffer()),nm=te.encode(f.n),cr=crc32(d),h=new DataView(new ArrayBuffer(30)),e=new DataView(new ArrayBuffer(46));
+h.setUint32(0,0x04034b50,true);h.setUint16(4,20,true);h.setUint32(14,cr,true);h.setUint32(18,d.length,true);h.setUint32(22,d.length,true);h.setUint16(26,nm.length,true);P.push(h,nm,d);
+e.setUint32(0,0x02014b50,true);e.setUint16(4,20,true);e.setUint16(6,20,true);e.setUint32(16,cr,true);e.setUint32(20,d.length,true);e.setUint32(24,d.length,true);e.setUint16(28,nm.length,true);e.setUint32(42,off,true);C.push(e,nm);
+off+=30+nm.length+d.length;cs+=46+nm.length}
+const z=new DataView(new ArrayBuffer(22));z.setUint32(0,0x06054b50,true);z.setUint16(8,fs.length,true);z.setUint16(10,fs.length,true);z.setUint32(12,cs,true);z.setUint32(16,off,true);return new Blob([...P,...C,z],{type:'application/zip'})}
+const ZT={png:'image/png',jpg:'image/jpeg',jpeg:'image/jpeg',webp:'image/webp',bmp:'image/bmp',gif:'image/gif',wav:'audio/wav',mp3:'audio/mpeg',ogg:'audio/ogg'};
+async function unzip(file){const d=new Uint8Array(await file.arrayBuffer()),v=new DataView(d.buffer,d.byteOffset,d.length),td=new TextDecoder(),out=[];let e=d.length-22;while(e>=0&&v.getUint32(e,true)!==0x06054b50)e--;if(e<0)throw Error('This is not a valid ZIP file.');
+const n=v.getUint16(e+10,true);let p=v.getUint32(e+16,true);
+for(let i=0;i<n;i++){const m=v.getUint16(p+10,true),sz=v.getUint32(p+20,true),nl=v.getUint16(p+28,true),xl=v.getUint16(p+30,true),kl=v.getUint16(p+32,true),lo=v.getUint32(p+42,true),nm=td.decode(d.subarray(p+46,p+46+nl));p+=46+nl+xl+kl;
+const bn=nm.split('/').pop(),ty=ZT[bn.split('.').pop().toLowerCase()];if(!bn||nm.startsWith('__MACOSX')||!ty)continue;
+const st=lo+30+v.getUint16(lo+26,true)+v.getUint16(lo+28,true);let u=d.subarray(st,st+sz);
+if(m===8)u=new Uint8Array(await new Response(new Blob([u]).stream().pipeThrough(new DecompressionStream('deflate-raw'))).arrayBuffer());else if(m!==0)continue;out.push(new File([u],bn,{type:ty}))}
+return out}
+async function stegoFiles(){const K=COV.kind,o=[];for(const r of RES){if(r.err)continue;let b,n=r.k+'-stego';if(K=='pix'){b=await new Promise(z=>outPix(COV,r.y).toBlob(z));n+='.png'}else if(K=='aud'){b=wav(r.y,COV.sr);n+='.wav'}else{b=new Blob([r.y],{type:'text/plain'});n+='.txt'}o.push({n,b})}return o}
+async function dlZip(){const a=document.createElement('a');a.href=URL.createObjectURL(await mkZip(await stegoFiles()));a.download='stego-results.zip';document.body.append(a);a.click();a.remove()}
+async function dlAll(){const K=COV.kind;for(const r of RES){if(r.err)continue;let b,n=r.k+'-stego';if(K=='pix'){b=await new Promise(z=>outPix(COV,r.y).toBlob(z));n+='.png'}else if(K=='aud'){b=wav(r.y,COV.sr);n+='.wav'}else{b=new Blob([r.y],{type:'text/plain'});n+='.txt'}
+const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=n;document.body.append(a);a.click();a.remove();await new Promise(z=>setTimeout(z,400))}}
+function cmpDraw(){const o=$('#out'),L=LB(),A=RES[CM.a],B=RES[CM.b];let h=sumTbl(),idx=[];
+if(CM.i>=0){if(CM.all)h+=allTbl();else if(S.ct==2){const r=RES[CM.i];idx=[CM.i];h+=`<div class="card" id="det"><b>Algorithm:</b> <select onchange="CM.i=+this.value;cmpDraw()">${RES.map((q,i)=>q.err?'':`<option value="${i}"${i==CM.i?' selected':''}>${q.n}</option>`).join('')}</select> &nbsp; ${L.r} vs ${L.s}</div><div id="prev"></div><div class="card" style="overflow-x:auto">${cmpTbl(r.V,r.VR,L.s,L.r)}</div>`}
+else{const op=k=>RES.map((r,i)=>r.err?'':`<option value="${i}"${i==CM[k]?' selected':''}>${r.n}</option>`).join('');idx=[CM.a,CM.b];
+h+=`<div class="card"><b>Choose two algorithms to compare (the ${L.r.toLowerCase()} is the reference)</b><br><br>${L.c} 1 <select onchange="CM.a=+this.value;cmpDraw()">${op('a')}</select> &nbsp; ${L.c} 2 <select onchange="CM.b=+this.value;cmpDraw()">${op('b')}</select></div><div id="prev"></div><div class="card" style="overflow-x:auto">${cmpTbl(A.V,B.V,L.c+' 1<br><small>'+A.n+'</small>',L.c+' 2<br><small>'+B.n+'</small>',[A.ov,B.ov])}</div>`}}
+o.innerHTML=h;if(idx.length)cmpPrev(idx)}
+async function cmpPrev(idx){const p=$('#prev'),L=LB(),d=document.createElement('div'),K=COV.kind,bl=[];d.className='grid';p.append(d);
+const cell=(t,e)=>{const c=document.createElement('div');c.className='card';c.innerHTML=`<small>${t}</small><br>`;c.append(e);d.append(c)},aud=b=>{const a=document.createElement('audio');a.controls=1;a.src=URL.createObjectURL(b);return a},pre=t=>{const e=document.createElement('textarea');e.value=t;e.readOnly=1;return e};
+cell(L.r,K=='pix'?outPix(COV,COV.x):K=='aud'?aud(wav(COV.x,COV.sr)):pre(COV.text));
+for(const[m,i]of idx.entries()){const r=RES[i];let e,b,n=r.k+'-stego';if(K=='pix'){e=outPix(COV,r.y);b=await new Promise(z=>e.toBlob(z));n+='.png'}else if(K=='aud'){b=wav(r.y,COV.sr);e=aud(b);n+='.wav'}else{e=pre(r.y);b=new Blob([r.y],{type:'text/plain'});n+='.txt'}
+cell(`${idx.length>1?L.c+' '+(m+1):L.s}: ${r.n}`,e);bl.push([b,n])}
+if(K=='pix')for(const i of idx){const r=RES[i];cell('Difference ×12: '+r.n,outPix(COV,r.y.map((v,k)=>Math.min(255,Math.abs(v-COV.x[k])*12))))}
+for(const[b,n]of bl){const a=document.createElement('a');a.className='b';a.href=URL.createObjectURL(b);a.download=n;a.textContent='Download '+n;p.append(a)}}
+async function run(){const o=$('#out');o.innerHTML='<p>Working…</p>';await new Promise(r=>setTimeout(r,30));
+try{if(S.op=='extract'&&S.mode=='stego'){let b;if(S.cov=='text')b=zx($('#covT').value);else{const c=await getCov();b=X[S.alg](c.x,c.P)}return payOut(unpack(b),o)}
+COV=await getCov();const pay=await getPay(),B=pack(pay.mime,pay.data),cm=S.mode=='cmp',al=cm?AL.filter(a=>ok(a[0])):[AL.find(a=>a[0]==S.alg)];RES=[];
+for(const a of al){o.innerHTML='<p>Working… '+a[1]+'</p>';await new Promise(r=>setTimeout(r,0));const r={n:a[1],k:a[0]};try{const t0=performance.now();let g;
+if(COV.kind=='txt'){r.y=zw(COV.text,B);r.hid=B.length;r.ms=performance.now()-t0;g=zx(r.y)}
+else{r.y=E[a[0]](COV.x,B,COV.P);r.ms=performance.now()-t0;g=X[a[0]](r.y,COV.P);r.acc=bA(g,B);Object.assign(r,met(COV.x,r.y,COV.P.hi,COV.kind=='aud'?32768:0))}
+r.ac=bA(g,B);r.hdr=hd(g);
+if(cm){const g0=COV.kind=='txt'?zx(COV.text):X[a[0]](COV.x,COV.P);r.ac0=g0.length?bA(g0,B):0;r.hdr0=hd(g0);r.B=B.length;r.V=vals(COV,r.y,r);r.VR=vals(COV,null,r);r.ov=avg(scores(r.V,r.VR))}
+}catch(e){r.err=e.message}RES.push(r)}
+if(cm){const v=RES.map((r,i)=>r.err?-1:i).filter(i=>i>=0);CM.i=CM.a=v.length?v[0]:-1;CM.b=v.length>1?v[1]:CM.a;return cmpDraw()}
+o.innerHTML=tbl()+'<div id="prev"></div>';pv(RES.findIndex(r=>!r.err))}catch(e){o.innerHTML=`<p class="er">${esc(e.message)}</p>`}}
+const ANA={R:[],pr:'bal'},WT={bal:[.4,.25,.35],inv:[.55,.35,.1],rob:[.2,.1,.7]},PRN={bal:'Balanced',inv:'Invisibility first',rob:'Robustness first'};
+const loadI=u=>new Promise((a,b)=>{const i=new Image();i.onload=()=>a(i);i.onerror=b;i.src=u});
+const cvOf=(c,im)=>{const v=document.createElement('canvas');v.width=c.w;v.height=c.h;v.getContext('2d',{willReadFrequently:true}).drawImage(im,0,0,c.w,c.h);return v};
+const fromCv=(c,v)=>{const g=v.getContext('2d',{willReadFrequently:true}).getImageData(0,0,c.w,c.h).data,n=c.w*c.h,x=new Int32Array(3*n);for(let i=0;i<n;i++)for(let k=0;k<3;k++)x[k*n+i]=g[4*i+k];return x};
+const jpg=q=>async(c,x)=>fromCv(c,cvOf(c,await createImageBitmap(await new Promise(z=>outPix(c,x).toBlob(z,'image/jpeg',q)))));
+const ATT=[{n:'JPEG quality 90',f:jpg(.9)},{n:'JPEG quality 70',f:jpg(.7)},
+{n:'Resize 50% and back',f:async(c,x)=>{const s=document.createElement('canvas');s.width=c.w>>1;s.height=c.h>>1;s.getContext('2d').drawImage(outPix(c,x),0,0,s.width,s.height);return fromCv(c,cvOf(c,s))}},
+{n:'Noise σ=3',f:async(c,x)=>{const r=rg(11);return x.map(v=>cl(Math.round(v+3*Math.sqrt(-2*Math.log(r()+1e-12))*Math.cos(6.2832*r())),0,255))}}];
+const ATA=[{n:'Noise (±2)',f:async(c,x)=>{const r=rg(11);return x.map(v=>cl(v+Math.round((r()-.5)*4),0,65535))}},
+{n:'Drop every 2nd sample + interpolate',f:async(c,x)=>{const y=x.slice();for(let i=1;i+1<y.length;i+=2)y[i]=Math.round((x[i-1]+x[i+1])/2);return y}},
+{n:'Reduce to 8-bit',f:async(c,x)=>x.map(v=>cl((v>>8<<8)+128,0,65535))},
+{n:'Smoothing (3-sample average)',f:async(c,x)=>{const y=x.slice();for(let i=1;i+1<y.length;i++)y[i]=Math.round((x[i-1]+x[i]+x[i+1])/3);return y}}];
+function anaScore(c,p,r,att){const V=vals(c,p,r),VR=vals(c,null,r);r.V=V;r.ov=avg(scores(V,VR));
+const au=c.kind=='aud';r.VR=VR;r.Q=cl((V.psnr-(au?40:30))/(au?50:40)*100,0,100)*.6+cl((V.ssim-.95)/.05*100,0,100)*.4;
+r.d=au?[Math.abs(V.lsb-VR.lsb),Math.abs(V.ent-VR.ent)/VR.ent*100,Math.abs(V.cen-VR.cen)/(VR.cen||1)*100,0]:[Math.abs(V.lsb-VR.lsb),Math.abs(V.uq-VR.uq)/VR.uq*100,Math.abs(V.grad-VR.grad)/(VR.grad||1)*100,100-V.hint];r.St=100-Math.min(100,au?25*r.d[0]+20*r.d[1]+2*r.d[2]:25*r.d[0]+2*r.d[1]+2*r.d[2]+5*r.d[3]);
+r.att=att;r.Rb=att.length?avg(att.map(a=>cl((a.acc-.5)/.5*100,0,100))):0}
+async function analyze(){const o=$('#out'),say=t=>{o.innerHTML='<p>'+esc(t)+'</p>'},wt=()=>new Promise(r=>setTimeout(r,0));
+try{const rf=$('#anR').files[0];let sf=[];for(const f0 of $('#anS').files){if(/\.zip$/i.test(f0.name))sf.push(...await unzip(f0));else sf.push(f0)}if(!rf)throw Error('Choose the real (original) pic.');if(!sf.length)throw Error('Choose at least one stego pic.');
+const isA=rf.type.startsWith('audio'),AT=isA?ATA:ATT;say('Reading the real file…');await wt();let c;if(isA)c=await loadAud(rf);else{const ri=await imgF(rf);c=toPix(ri,ri.naturalWidth,ri.naturalHeight)}COV=c;S.cov=isA?'audio':'image';const R=[];
+for(const[j,fl]of sf.entries()){const r={file:fl.name.replace(/\.[^.]+$/,'')};say(`Analysing ${j+1}/${sf.length}: ${fl.name}`);await wt();
+try{let p;if(isA){p=await loadAud(fl);if(p.x.length!=c.x.length)throw Error('length is different from the real audio')}else{const im=await imgF(fl);p=toPix(im,im.naturalWidth,im.naturalHeight);if(p.w!=c.w||p.h!=c.h)throw Error(`size ${p.w}×${p.h} is different from the real pic ${c.w}×${c.h}`)}
+let fd=null;for(const a of AL){if(a[0]=='echo'&&!isA)continue;try{fd={k:a[0],l:a[1],u:unpack(X[a[0]](p.x,p.P))};break}catch(e){}}
+if(fd&&fd.k=='lsb'){let ch=0,ok1=0;for(let i=0;i<p.x.length;i++){const d=p.x[i]-c.x[i];if(d){ch++;if(d==1&&!(c.x[i]&1)||d==-1&&(c.x[i]&1))ok1++}}if(ch&&ok1/ch<.9)fd={...fd,k:'lsbm',l:AL.find(a=>a[0]=='lsbm')[1]}}
+r.alg=fd?fd.l:r.file;r.k=fd&&fd.k;let B=[],att=[];
+if(fd){B=pack(fd.u.mime,fd.u.data);r.pl=fd.u.data.length;
+for(const a of AT){say(`Testing ${r.alg} (${j+1}/${sf.length}): ${a.n}`);await wt();let ac=.5;try{ac=bA(X[fd.k](await a.f(c,p.x),c.P),B)}catch(e){}att.push({n:a.n,acc:ac})}}
+const z={n:r.alg,B:B.length,hdr:!!fd,ac:fd?1:0,ac0:.5,hdr0:false,ms:null};anaScore(c,p.x,z,att);Object.assign(r,z,{alg:r.alg})}
+catch(e){r.err=e.message}R.push(r)}
+ANA.AT=AT;ANA.A=isA;const cnt={};R.forEach(r=>{if(r.k)cnt[r.alg]=(cnt[r.alg]||0)+1});R.forEach(r=>{if(r.k&&cnt[r.alg]>1)r.alg+=' ('+r.file+')'});ANA.R=R;ANA.pr='bal';anaDraw()}catch(e){o.innerHTML=`<p class="er">${esc(e.message)}</p>`}}
+function anaDraw(){const o=$('#out'),W=WT[ANA.pr],R=ANA.R.filter(r=>r.k&&!r.err),NA=ANA.AT.length,au=ANA.A,fm=au?'WAV':'PNG';if(!R.length){o.innerHTML=ANA.R.map(r=>`<p class="er">${esc(r.file)}: ${esc(r.err||'no hidden data found by any extractor (the file may be resized/compressed, or was not made by StegoLab)')}</p>`).join('');return}
+R.forEach(r=>r.T=W[0]*r.Q+W[1]*r.St+W[2]*r.Rb);R.sort((a,b)=>b.T-a.T);
+const sv=r=>r.att.filter(a=>a.acc===1).length,mx=g=>R.reduce((a,b)=>g(b)>g(a)?b:a),mn=g=>R.reduce((a,b)=>g(b)<g(a)?b:a),bo=R[0],bq=mx(r=>r.Q),bs=mx(r=>r.St),br=mx(r=>r.Rb),wq=mn(r=>r.Q),ws=mn(r=>r.St),any=R.some(r=>sv(r)>0),fr=R.filter(r=>sv(r)==0).map(r=>r.alg),cb=mx(r=>r.Q+r.St),B=new Set(R.map(r=>r.pl));
+const bar=v=>`<td class="mt" style="--p:${v}%">${v.toFixed(1)}`,T=(a,b)=>`<table class="${R.length>6?'mx':''}"><tr>${a.map(t=>`<th>${t}`).join('')}</tr>${b}</table>`;
+const sum=`<div class="card"><h3 style="margin-top:0">Verdict (${PRN[ANA.pr]})</h3><ul>
+<li><b>Best overall:</b> ${bo.alg}: score ${bo.T.toFixed(1)}/100, PSNR ${f(bo.V.psnr)} dB, survived ${sv(bo)}/${NA} attacks.</li>
+<li><b>Most invisible (best image quality):</b> ${bq.alg}: PSNR ${f(bq.V.psnr)} dB, SSIM ${f(bq.V.ssim,5)}.</li>
+<li><b>Hardest to detect statistically:</b> ${bs.alg}: stealth ${bs.St.toFixed(1)}/100.</li>
+<li><b>Most robust:</b> ${any?`${br.alg}: survived ${sv(br)}/${NA} attacks, average bit accuracy ${f(avg(br.att.map(a=>a.acc))*100,1)}%.`:'none. Every algorithm lost its payload after the attacks, so only use lossless ${fm} files with this set.'}</li>
+${R.length>1?`<li><b>Lowest quality:</b> ${wq.alg} (PSNR ${f(wq.V.psnr)} dB). <b>Easiest to detect:</b> ${ws.alg} (stealth ${ws.St.toFixed(1)}/100).</li>`:''}
+${fr.length&&fr.length<R.length?`<li><b>Avoid if the file may be re-compressed or resized:</b> ${fr.join(', ')} (payload destroyed by every attack).</li>`:''}</ul>
+<p><b>Which one to use?</b></p><ul>
+<li>Sharing the original ${fm} file unchanged: use <b>${cb.alg}</b> (best quality + stealth together).</li>
+<li>${au?'Sending through apps that compress or resample audio':'Posting on social media or messengers (JPEG/resize)'}: ${any?`use <b>${br.alg}</b>.`:'no algorithm here is safe; the payload will be lost.'}</li>
+<li>Maximum secrecy: use <b>${bs.alg}</b>.</li></ul>
+${B.size>1?'<p class="er"><small>Warning: the files carry different payload sizes, so quality numbers are not perfectly fair. Embed the same payload with every algorithm (Compare mode) for a fair test.</small></p>':''}
+<small>Score = Quality (PSNR 30→70 dB and SSIM, 60/40) × ${W[0]} + Stealth (LSB-ratio, colour-count, gradient and histogram shifts; heuristic) × ${W[1]} + Robustness (bit accuracy after ${NA} attacks) × ${W[2]}. Capacity is not measured here.</small></div>`;
+const rk=T(['Rank','Algorithm','Quality','Stealth','Robustness','Overall','PSNR dB','SSIM','Survived'],R.map((r,i)=>`<tr><td>${i+1}${i==0?' 🥇':''}<td>${r.alg}${bar(r.Q)}${bar(r.St)}${bar(r.Rb)}${bar(r.T)}<td>${f(r.V.psnr)}<td>${f(r.V.ssim,5)}<td>${sv(r)}/${NA}`).join('')),
+at=T(['Algorithm',...ANA.AT.map(a=>a.n)],R.map(r=>`<tr><td>${r.alg}${r.att.map(a=>`<td>${a.acc===1?'✅':'❌'} ${(a.acc*100).toFixed(1)}%`).join('')}`).join('')),
+dt=T(['Algorithm','Overall match %','Identical samples %','Payload recovered (bytes)','LSB ratio shift (pp)',au?'Entropy change %':'Unique-colour change %',au?'Spectral-centroid change %':'Gradient change %',au?'–':'Histogram intersection %'],R.map(r=>`<tr><td>${r.alg}<td>${f(r.ov,3)}%<td>${f(r.V.idS,4)}%<td>${ii(r.pl)}<td>${f(r.d[0],4)}<td>${f(r.d[1],3)}<td>${f(r.d[2],3)}<td>${au?'–':f(r.V.hint,3)+'%'}`).join('')),
+sk=ANA.R.filter(r=>r.err||!r.k).map(r=>`<p class="er"><small>${esc(r.file)}: ${esc(r.err||'no hidden data found by any extractor (resized/compressed, or not made by StegoLab)')}</small></p>`).join('');
+o.innerHTML=`<div class="card">Priority: <select onchange="ANA.pr=this.value;anaDraw()">${Object.keys(PRN).map(k=>`<option value="${k}"${k==ANA.pr?' selected':''}>${PRN[k]}</option>`).join('')}</select></div>${sum}<div class="card" style="overflow-x:auto"><b>Ranking</b>${rk}</div><div class="card" style="overflow-x:auto"><b>Robustness test: payload recovery after attack</b>${at}<small>✅ = payload fully recovered, ❌ = damaged or lost.</small></div><div class="card" style="overflow-x:auto"><b>Detailed numbers (vs the real pic)</b>${dt}</div><details class="card"><summary><b>Full feature table: all ${R.length} algorithms side by side</b></summary><div id="fm"></div></details>${sk}`;RES=R.map(r=>({...r,n:r.alg}));const fm2=$('#fm');if(fm2)fm2.innerHTML=allTbl()}
+
+const tbl=()=>`<div class="card" style="overflow-x:auto"><table><tr><th>Algorithm<th>PSNR dB<th>MSE<th>SSIM<th>SNR dB<th>Bit accuracy</tr>${RES.map((r,i)=>r.err?`<tr><td>${r.n}<td colspan="5" class="er">${esc(r.err)}`:`<tr class="cl" onclick="pv(${i})"><td>${r.n}<td>${f(r.psnr)}<td>${f(r.mse,3)}<td>${f(r.ssim,4)}<td>${S.cov=='audio'?f(r.snr):'–'}<td>${r.acc==null?r.hid+' invisible chars':(r.acc*100).toFixed(1)+'%'}`).join('')}</table><small>Click a row to compare original and stego.</small></div>`;
+async function pv(i){const r=RES[i],p=$('#prev');if(!r||r.err){p.innerHTML='';return}p.innerHTML=`<div class="card"><b>${r.n}</b>: original vs stego</div>`;const d=document.createElement('div');d.className='grid';p.append(d);
+const cell=(t,e)=>{const c=document.createElement('div');c.className='card';c.innerHTML=`<small>${t}</small><br>`;c.append(e);d.append(c)},aud=b=>{const a=document.createElement('audio');a.controls=1;a.src=URL.createObjectURL(b);return a},pre=t=>{const e=document.createElement('textarea');e.value=t;e.readOnly=1;return e};
+let b,n='stego';if(COV.kind=='pix'){cell('Original',outPix(COV,COV.x));cell('Stego',outPix(COV,r.y));cell('Difference ×12',outPix(COV,r.y.map((v,k)=>Math.min(255,Math.abs(v-COV.x[k])*12))));b=await new Promise(z=>outPix(COV,r.y).toBlob(z));n+='.png'}
+else if(COV.kind=='aud'){cell('Original',aud(wav(COV.x,COV.sr)));b=wav(r.y,COV.sr);cell('Stego',aud(b));n+='.wav'}
+else{cell('Original',pre(COV.text));cell('Stego (looks identical)',pre(r.y));b=new Blob([r.y],{type:'text/plain'});n+='.txt'}
+const a=document.createElement('a');a.className='b';a.href=URL.createObjectURL(b);a.download=n;a.textContent='Download '+n;p.append(a)}
+let LASTU;async function verify(){const vf=$('#verF'),vt=$('#verT'),r=$('#vres');let ref=null;if(vf&&vf.files[0])ref=new Uint8Array(await vf.files[0].arrayBuffer());else if(vt&&vt.value)ref=new TextEncoder().encode(vt.value);if(!ref){r.innerHTML='';return}
+const a=LASTU.data,n=Math.max(ref.length,a.length);let d=0;for(let i=0;i<n;i++)if(ref[i]!==a[i])d++;
+r.innerHTML=d?`<p class="er"><b>❌ Different from the original:</b> ${d} of ${n} bytes differ (original ${ref.length} bytes, extracted ${a.length} bytes).</p>`:`<p><b>✅ Identical to the original:</b> all ${n} bytes match exactly.</p>`}
+async function payOut(u,o){const bl=new Blob([u.data],{type:u.mime}),url=URL.createObjectURL(bl),m=u.mime.split('/')[0],ext=(u.mime.split('/')[1]||'bin').split(/[+;]/)[0].replace('plain','txt').replace('jpeg','jpg').replace('mpeg','mp3'),ck=crc32(u.data).toString(16).padStart(8,'0');
+let sha='',vr='',ref=null;try{sha=[...new Uint8Array(await crypto.subtle.digest('SHA-256',u.data))].map(b=>b.toString(16).padStart(2,'0')).join('')}catch(e){}
+LASTU=u;
+o.innerHTML=`<div class="card"><b>Hidden ${esc(m)} extracted</b> (${u.data.length} bytes, ${esc(u.mime)})${vr}<small>CRC32 ${ck}${sha?' · SHA-256 '+sha.slice(0,16)+'…':''} (if it is the same as the original file’s value, the data is identical)</small><br><br><div id="pvw"></div><br><a class="b" href="${url}" download="extracted.${ext}">Download</a><hr><b>Check against the original (optional)</b><br><small>Choose the file you originally hid. StegoLab tells you if the result is exactly the same.</small><br>${S.pay=='text'?'<textarea id="verT" rows="2" placeholder="Paste the original text here" oninput="verify()"></textarea>':'<input type="file" id="verF" onchange="verify()">'}<div id="vres"></div></div>`;
+const pv=$('#pvw');
+if(m=='text'){const e=document.createElement('pre');e.textContent=new TextDecoder().decode(u.data);pv.append(e)}
+else if(m=='image'){try{const b=await createImageBitmap(bl),cv=document.createElement('canvas');cv.width=b.width;cv.height=b.height;cv.getContext('2d').drawImage(b,0,0);cv.style.maxWidth='100%';pv.append(cv)}catch(e){pv.innerHTML='<p class="er">The bytes were recovered, but this browser cannot show this image format here. Download it and open it on your computer, or give the original payload in the optional box to verify it.</p>'}}
+else if(m=='audio'||m=='video'){const e=document.createElement(m);e.controls=true;e.src=url;e.style.maxWidth='100%';pv.append(e)}}
+draw();
+</script></body></html>
